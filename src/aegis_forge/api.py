@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from aegis_forge.benchmark import run_benchmark
 from aegis_forge.evaluation import evaluate_suite
 from aegis_forge.service import ServiceContainer
+from aegis_forge.telemetry import tracer
 from aegis_forge.web import dashboard
 
 
@@ -21,16 +25,36 @@ class InvestigationRequest(BaseModel):
         return " ".join(value.split())
 
 
+class ApprovalRequest(BaseModel):
+    run_id: str
+    action: dict[str, Any]
+
+
+class ApprovalDecision(BaseModel):
+    run_id: str
+    approval_id: str
+
+
+def _authorize(service: ServiceContainer, token: str | None) -> None:
+    if service.settings.api_token and token != service.settings.api_token:
+        raise HTTPException(status_code=401, detail="invalid API token")
+
+
 def create_app(container: ServiceContainer | None = None) -> FastAPI:
     service = container or ServiceContainer.create()
-    app = FastAPI(title="Aegis Forge", version="0.2.0", description="Guarded local AI incident operations")
+    app = FastAPI(title="Aegis Forge", version="0.3.0", description="Guarded local AI incident operations")
     app.state.service = service
 
     @app.middleware("http")
     async def observe_requests(request: Request, call_next):
-        with service.metrics.observe(request.url.path):
-            response = await call_next(request)
+        with tracer.start_as_current_span(f"HTTP {request.method} {request.url.path}") as span:
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.route", request.url.path)
+            with service.metrics.observe(request.url.path):
+                response = await call_next(request)
+            span.set_attribute("http.status_code", response.status_code)
         response.headers["X-Request-ID"] = request.headers.get("X-Request-ID", "generated")
+        response.headers["X-Trace-ID"] = format(span.get_span_context().trace_id, "032x")
         return response
 
     @app.get("/", include_in_schema=False)
@@ -57,7 +81,8 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
         return service.metrics.snapshot()
 
     @app.post("/api/investigate")
-    def investigate(request: InvestigationRequest) -> dict[str, Any]:
+    def investigate(request: InvestigationRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
         result = service.agent.investigate(request.incident, namespace=request.namespace)
         if not result.get("allowed", True):
             raise HTTPException(status_code=400, detail={"message": "Prompt rejected by security guard", "reasons": result.get("reasons", [])})
@@ -78,9 +103,45 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="decision graph not found")
         return {"run_id": run_id, "decision_graph": decision}
 
+    @app.get("/api/runs/{run_id}/events")
+    async def events(run_id: str):
+        async def stream():
+            sent = 0
+            for _ in range(80):
+                events = service.agent.store.trace_for(run_id)
+                for event in events[sent:]:
+                    yield f"event: {event['event']}\ndata: {json.dumps(event)}\n\n"
+                sent = len(events)
+                if sent and any(event["event"] in {"completion", "approval_proposed", "decision_graph"} for event in events):
+                    break
+                await asyncio.sleep(0.1)
+        return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+    @app.post("/api/approvals/propose")
+    def propose_approval(request: ApprovalRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
+        return service.approvals.propose(request.run_id, request.action)
+
+    @app.post("/api/approvals/approve")
+    def approve(request: ApprovalDecision, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
+        return service.approvals.approve(request.run_id, request.approval_id)
+
+    @app.post("/api/approvals/execute")
+    def execute(request: ApprovalDecision, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
+        try:
+            return service.approvals.execute(request.run_id, request.approval_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     @app.post("/api/evaluate")
     def evaluate() -> dict[str, Any]:
         return evaluate_suite(service.agent.store)
+
+    @app.post("/api/benchmark")
+    def benchmark() -> dict[str, Any]:
+        return run_benchmark(service.agent, repetitions=20)
 
     return app
 

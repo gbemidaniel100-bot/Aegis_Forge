@@ -106,7 +106,12 @@ class IncidentAgent:
             + "\n\nTool outputs:\n"
             + str(tool_calls)
         )
-        response, backend = self.model.complete(prompt)
+        completion = self.model.complete(prompt)
+        if len(completion) == 3:
+            response, backend, routing = completion
+        else:
+            response, backend = completion
+            routing = {"attempts": [{"model": backend, "status": "single-provider"}]}
         if not response:
             response = (
                 "Likely root cause: a recent change introduced a regression in the affected service. "
@@ -114,7 +119,7 @@ class IncidentAgent:
                 "Recommended action: verify the newest release, inspect database or gateway health, and confirm the error budget before rollback or escalation."
             )
             backend = "offline"
-        self.store.trace(run_id, "completion", {"model_backend": backend, "response": response})
+        self.store.trace(run_id, "completion", {"model_backend": backend, "response": response, "routing": routing})
 
         memory_text = f"namespace={namespace}; incident={sanitized}; summary={response[:500]}"
         self.store.remember(namespace, memory_text, importance=0.8)
@@ -129,6 +134,7 @@ class IncidentAgent:
             "tool_count": len(tool_calls),
             "namespace": namespace,
             "model_backend": backend,
+            "routing": routing,
             "memory_count": len(self.store.memories(namespace, limit=10)),
         }
 

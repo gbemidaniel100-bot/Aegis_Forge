@@ -34,6 +34,7 @@ def test_metrics_and_trace_contract():
     client = _client()
     response = client.post("/api/investigate", json={"incident": "Gateway has elevated 5xx after deploy", "namespace": "test"})
     assert response.status_code == 200
+    assert len(response.headers["X-Trace-ID"]) == 32
     run_id = response.json()["run_id"]
     trace = client.get(f"/api/runs/{run_id}/trace")
     assert trace.status_code == 200
@@ -43,3 +44,13 @@ def test_metrics_and_trace_contract():
     assert decision.json()["decision_graph"]["policy"]["human_approval_required"] is True
     metrics = client.get("/metrics").text
     assert "aegis_requests_total" in metrics
+
+
+def test_optional_bearer_auth_is_enforced():
+    tempdir = tempfile.TemporaryDirectory()
+    settings = Settings(db_path=str(Path(tempdir.name) / "auth.db"), api_token="test-secret")
+    client = TestClient(create_app(ServiceContainer.create(settings)))
+    assert client.post("/api/investigate", json={"incident": "hello"}).status_code == 401
+    response = client.post("/api/investigate", headers={"Authorization": "Bearer test-secret"}, json={"incident": "hello"})
+    assert response.status_code == 200
+    tempdir.cleanup()

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 - 2026-09-20
+
+### Added
+
+- OpenTelemetry HTTP spans with trace IDs, live SSE event streams, and model attempt telemetry.
+- Priority model routing with retry budgets, timeouts, circuit breakers, fallback providers, and SSRF host validation.
+- 60-task evaluation benchmark with accuracy, hallucination, success, category, and p50/p95 latency reporting.
+- Authenticated propose/approve/execute workflow for human-in-the-loop action control.
+- Cloud VM deployment guide and local-first routing ADR.
+
 ## 0.2.0 - 2026-09-20
 
 ### Added

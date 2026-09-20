@@ -18,6 +18,8 @@ class Settings:
     max_tool_calls: int = _positive_int("AEGIS_MAX_TOOL_CALLS", 6)
     request_timeout_seconds: float = float(os.getenv("AEGIS_REQUEST_TIMEOUT_SECONDS", "20"))
     environment: str = os.getenv("AEGIS_ENVIRONMENT", "development")
+    api_token: str = os.getenv("AEGIS_API_TOKEN", "")
+    model_fallback: str = os.getenv("AEGIS_MODEL_FALLBACK", "")
 
     def ensure_data_dir(self) -> None:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

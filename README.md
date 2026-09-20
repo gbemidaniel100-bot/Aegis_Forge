@@ -22,6 +22,11 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Security:** input length limits, namespace validation, prompt-injection checks, secret/number redaction, no arbitrary tool execution, and a human-approval boundary for destructive actions.
 - **Service engineering:** app factory, readiness probe, Prometheus-compatible metrics, request validation, SQLite WAL mode, busy timeout, and concurrency-safe persistence.
 - **Evidence-to-decision graph:** ranked hypotheses, source citations, blast-radius framing, reversible actions, counterfactual checks, and explicit human-approval policy. This is the core product differentiator: Aegis turns evidence into an inspectable decision artifact, not an opaque answer.
+- **Model routing:** priority-ordered Ollama candidates with retries, timeout budgets, circuit breakers, and provider-attempt telemetry.
+- **Human-in-the-loop:** propose, approve, and execute endpoints. The default runtime never executes a mutation without an approval trace.
+- **Live operations:** server-sent event streams expose security, retrieval, tool, model, decision, and approval stages to the dashboard.
+- **Evaluation science:** a 60-task benchmark reports retrieval accuracy, evidence-bound hallucination rate, success rate, per-category quality, and p50/p95 latency.
+- **OpenTelemetry:** every HTTP request gets a service span and trace ID response header, ready for OTLP exporters without changing the application workflow.
 
 ## Quick start
 
@@ -51,9 +56,12 @@ Configuration is environment-based:
 ```bash
 cp .env.example .env
 export AEGIS_MODEL=llama3.2:3b
+export AEGIS_MODEL_FALLBACK=llama3.2:1b
 ```
 
 The application does not load `.env` automatically; exporting variables keeps deployment behavior explicit.
+
+Cloud VM deployment is documented in [docs/cloud-vm.md](docs/cloud-vm.md), with the routing decision recorded in [docs/adr-001-local-first-model-routing.md](docs/adr-001-local-first-model-routing.md).
 
 ## CLI and API
 
@@ -66,7 +74,7 @@ curl -X POST http://127.0.0.1:8000/api/investigate \
 	-d '{"incident":"Database connections are exhausted and retries are increasing","namespace":"demo"}'
 ```
 
-Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, `GET /api/runs/{run_id}/decision`, `POST /api/evaluate`, `GET /ready`, `GET /metrics`, and `GET /metrics/json`. Open `/docs` for the generated OpenAPI contract.
+Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, `GET /api/runs/{run_id}/events`, `GET /api/runs/{run_id}/decision`, `POST /api/evaluate`, `POST /api/benchmark`, `POST /api/approvals/propose`, `POST /api/approvals/approve`, `POST /api/approvals/execute`, `GET /ready`, `GET /metrics`, and `GET /metrics/json`. Open `/docs` for the generated OpenAPI contract.
 
 ## Architecture
 
