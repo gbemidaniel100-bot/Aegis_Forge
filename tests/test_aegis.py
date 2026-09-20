@@ -2,7 +2,8 @@ import unittest
 from pathlib import Path
 
 from aegis_forge.agent import IncidentAgent
-from aegis_forge.evaluation import evaluate_case, evaluate_suite
+from aegis_forge.db import Store
+from aegis_forge.evaluation import evaluate_suite
 from aegis_forge.retrieval import Retriever
 from aegis_forge.security import inspect_input, redact
 
@@ -35,6 +36,17 @@ class TestAegisForge(unittest.TestCase):
         self.assertIn("summary", result)
         self.assertTrue(result["trace"])
         self.assertTrue(agent.store.memories("demo"))
+        self.assertIn("confidence", result)
+        self.assertIn("recommendations", result)
+        self.assertIn("observability", result)
+
+    def test_namespace_memory_is_isolated(self):
+        store = Store(str(Path("data/test_namespace.db")))
+        store.remember("alpha", "database pool saturation on payments API", importance=0.9)
+        store.remember("beta", "credential leak in secrets manager", importance=0.8)
+        self.assertEqual(len(store.memories("alpha")), 1)
+        self.assertEqual(len(store.memories("beta")), 1)
+        self.assertIn("database", store.memories("alpha")[0]["content"].lower())
 
     def test_eval_suite_scores_incident_cases(self):
         scorecard = evaluate_suite()
