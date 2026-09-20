@@ -77,6 +77,30 @@ def test_retriever_supports_injected_semantic_encoder():
     assert result[0]["retrieval_mode"] == "hybrid"
 
 
+def test_structured_decision_rejects_invalid_model_output():
+    class InvalidModel:
+        def complete_json(self, prompt, timeout=8.0):
+            return {"facts": []}, "ollama-json"
+
+    from aegis_forge.decision import DecisionEngine
+    graph, backend = DecisionEngine().build_with_model("Database connections are exhausted", [], [], InvalidModel())
+    assert graph["policy"]["evidence_bound"] is True
+    assert backend == "deterministic-invalid-model-output"
+
+
+def test_router_records_complexity_based_selection_reason():
+    class HealthyModel:
+        def complete(self, prompt, timeout=8.0):
+            return "grounded response", "small"
+
+    router = ModelRouter([ModelCandidate("small", HealthyModel(), 0, context_limit=200, max_complexity=1)])
+    response, backend, metadata = router.complete("short incident")
+    assert response == "grounded response"
+    assert backend == "small"
+    assert metadata["selection"]["complexity"]["level"] == 1
+    assert "complexity=1" in metadata["selected_reason"]
+
+
 def test_benchmark_reports_p99():
     result = run_benchmark(repetitions=1)
     assert "p99" in result["latency_ms"]

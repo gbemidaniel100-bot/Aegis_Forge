@@ -14,4 +14,4 @@ if not isinstance(trace.get_tracer_provider(), TracerProvider):
 if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
     _provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 
-tracer = trace.get_tracer("aegis-forge", "0.4.0")
+tracer = trace.get_tracer("aegis-forge", "0.5.0")

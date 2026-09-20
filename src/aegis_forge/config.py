@@ -20,6 +20,8 @@ class Settings:
     environment: str = os.getenv("AEGIS_ENVIRONMENT", "development")
     api_token: str = os.getenv("AEGIS_API_TOKEN", "")
     model_fallback: str = os.getenv("AEGIS_MODEL_FALLBACK", "")
+    embedding_model: str = os.getenv("AEGIS_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    enable_embeddings: bool = os.getenv("AEGIS_ENABLE_EMBEDDINGS", "false").lower() == "true"
 
     def ensure_data_dir(self) -> None:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

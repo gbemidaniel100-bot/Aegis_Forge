@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 - 2026-09-20
+
+### Added
+
+- Optional local Sentence Transformers embeddings with lexical-semantic hybrid retrieval.
+- Structured Ollama JSON decision generation with schema and evidence-bound validation.
+- Explicit `.[rag]` installation extra and embedding configuration.
+- Evaluation results now document retrieval precision/recall and model-grounded decision quality.
+
 ## 0.4.0 - 2026-09-20
 
 ### Added

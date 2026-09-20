@@ -148,8 +148,8 @@ class IncidentAgent:
         recommendations = self._recommendations(sanitized, evidence)
         confidence = self._infer_confidence(evidence, tool_calls)
         with tracer.start_as_current_span("aegis.decision"):
-            decision_graph = self.decision_engine.build(sanitized, evidence, tool_calls)
-        self.store.trace(run_id, "decision_graph", decision_graph)
+            decision_graph, decision_backend = self.decision_engine.build_with_model(sanitized, evidence, tool_calls, self.model)
+        self.store.trace(run_id, "decision_graph", {**decision_graph, "decision_backend": decision_backend})
         observability = {
             "security_gate": "passed",
             "retrieval_hits": len(evidence),
@@ -157,6 +157,7 @@ class IncidentAgent:
             "namespace": namespace,
             "model_backend": backend,
             "routing": routing,
+            "decision_backend": decision_backend,
             "memory_count": len(self.store.memories(namespace, limit=10)),
             "memory_status": memory_status,
         }

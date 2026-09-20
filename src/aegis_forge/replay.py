@@ -23,6 +23,8 @@ def replay_run(store: Store, run_id: str, agent: IncidentAgent) -> dict[str, Any
     if not request:
         raise ValueError("run has no replayable sanitized request")
     original = next((event["payload"] for event in events if event["event"] == "decision_graph"), None)
+    if original:
+        original = {key: value for key, value in original.items() if key != "decision_backend"}
     retrieval = next((event["payload"] for event in events if event["event"] == "retrieval"), {})
     tools = [event["payload"]["result"] for event in events if event["event"] == "tool_call" and event["payload"].get("result")]
     current = DecisionEngine().build(request, retrieval.get("hits", []), tools)

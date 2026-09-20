@@ -14,7 +14,7 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 
 - **Agent orchestration:** a stateful investigation loop with explicit policy, retrieval, planning, tools, synthesis, memory, and evaluation stages.
 - **Model orchestration:** Ollama is the local reasoning provider, with a tested offline path so the demo never depends on a cloud API or a running model.
-- **RAG:** a tiny inspectable runbook corpus with token-scored retrieval and source IDs in every result. The retriever is intentionally replaceable with embeddings later.
+- **Hybrid RAG:** lexical retrieval plus an optional local Sentence Transformers encoder (`pip install -e '.[rag]'`), weighted fusion, trusted-document filtering, reranking, versioned citations, and source confidence metadata. Embeddings are opt-in so offline CI remains deterministic.
 - **Tool use:** an allowlisted registry of deterministic adapters. Every adapter is read-only, risk-labelled, bounded by `AEGIS_MAX_TOOL_CALLS`, and recorded.
 - **Memory:** SQLite stores namespace-scoped incident learnings with importance ordering.
 - **Observability:** every run emits append-only events for security, retrieval, tool calls, and completion; traces are available from the API.
@@ -28,6 +28,11 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Evaluation science:** a 60-task benchmark reports retrieval accuracy, evidence-bound hallucination rate, success rate, per-category quality, and p50/p95 latency.
 - **OpenTelemetry:** every HTTP request gets a service span and trace ID response header, ready for OTLP exporters without changing the application workflow.
 - **Performance engineering:** the checked-in load profiler measures 1/10/50/100/200-worker runs with throughput, failure rate, p50/p95/p99 latency, and peak traced memory.
+- **Structured decisions:** Ollama JSON mode can produce the decision graph directly; schema validation rejects malformed or ungrounded model output and uses the deterministic engine instead.
+
+## Evaluation Results
+
+Latest offline reference run: 60 tasks, retrieval accuracy/recall `0.9167`, precision `0.7777`, groundedness `1.0`, tool accuracy `1.0`, decision quality `1.0`, failure recovery `1.0`, hallucination rate `0.0`, success rate `1.0`, p50/p95/p99 latency `17.91 / 29.03 / 59.16 ms`. Re-run with `aegis --eval` or `make eval`; these are deterministic local-fallback measurements, not claims about Ollama throughput.
 
 ## Quick start
 

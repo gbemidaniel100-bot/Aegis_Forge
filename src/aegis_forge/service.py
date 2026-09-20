@@ -8,6 +8,7 @@ from aegis_forge.approval import ApprovalWorkflow
 from aegis_forge.config import Settings, settings
 from aegis_forge.model import LocalModel
 from aegis_forge.observability import Metrics, RateLimiter
+from aegis_forge.retrieval import Retriever, SentenceTransformerEncoder
 from aegis_forge.routing import ModelCandidate, ModelRouter, validate_model_url
 
 
@@ -26,6 +27,8 @@ class ServiceContainer:
         if configured.model_fallback:
             candidates.append(ModelCandidate(configured.model_fallback, LocalModel(configured.ollama_url, configured.model_fallback), 1))
         agent = IncidentAgent(storage_path=configured.db_path, model=ModelRouter(candidates))
+        if configured.enable_embeddings:
+            agent.retriever = Retriever(encoder=SentenceTransformerEncoder(configured.embedding_model))
         return cls(configured, agent, Metrics(), ApprovalWorkflow(agent.store), RateLimiter())
 
     def readiness(self) -> dict[str, object]:

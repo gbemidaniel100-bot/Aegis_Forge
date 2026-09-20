@@ -21,6 +21,24 @@ class SemanticEncoder(Protocol):
     def encode(self, text: str) -> list[float]: ...
 
 
+class SentenceTransformerEncoder:
+    """Lazy local embedding provider; model weights are loaded only when RAG is enabled."""
+
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self._model = None
+
+    def encode(self, text: str) -> list[float]:
+        if self._model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError("install aegis-forge[rag] to enable local embeddings") from exc
+            self._model = SentenceTransformer(self.model_name)
+        vector = self._model.encode(text, normalize_embeddings=True)
+        return [float(value) for value in vector]
+
+
 DEFAULT_CORPUS = [
     Document("rb-001", "Elevated 5xx responses", "Check deploys and error budget. Compare gateway and application logs. Roll back the newest release only after confirming the regression. Escalate to service owner if errors persist for 10 minutes."),
     Document("rb-002", "Database connection exhaustion", "Inspect connection pool saturation and database CPU. Reduce retry storms before increasing pool size. Fail closed for destructive operations. Capture a query sample and page the database owner."),

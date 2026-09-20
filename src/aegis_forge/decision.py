@@ -93,3 +93,19 @@ class DecisionEngine:
                 "evidence_bound": True,
             },
         }
+
+    def build_with_model(self, incident: str, evidence: list[dict[str, Any]], tools: list[dict[str, Any]], model: Any) -> tuple[dict[str, Any], str]:
+        fallback = self.build(incident, evidence, tools)
+        complete_json = getattr(model, "complete_json", None)
+        if complete_json is None:
+            return fallback, "deterministic"
+        prompt = (
+            "Return JSON only with keys facts, inferences, unknowns, primary_hypothesis, alternatives, actions, "
+            "counterfactuals, blast_radius, policy. Use only the supplied evidence. Every action must include risk and reversible.\n"
+            f"Incident: {incident}\nEvidence: {evidence}\nTools: {tools}"
+        )
+        candidate, backend = complete_json(prompt)
+        required = {"facts", "inferences", "unknowns", "primary_hypothesis", "alternatives", "actions", "counterfactuals", "blast_radius", "policy"}
+        if not isinstance(candidate, dict) or not required <= candidate.keys() or not candidate.get("policy", {}).get("evidence_bound"):
+            return fallback, "deterministic-invalid-model-output"
+        return candidate, backend

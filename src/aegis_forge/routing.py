@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -76,6 +77,21 @@ class ModelRouter:
                     self.history[candidate.name]["failures"] += 1
                     attempts.append({"model": candidate.name, "status": "failed", "attempt": attempt + 1, "error": type(exc).__name__})
         return "", "offline", {"attempts": attempts, "latency_ms": round((time.perf_counter() - started) * 1000, 2), "selection": selection, "selected_reason": "all eligible providers failed or were circuit-open"}
+
+    def complete_json(self, prompt: str, timeout: float = 8.0) -> tuple[dict, str]:
+        candidates, _ = self._rank(prompt)
+        for candidate in candidates:
+            method = getattr(candidate.model, "complete_json", None)
+            if method is None:
+                continue
+            payload, backend = method(prompt, timeout=timeout)
+            if isinstance(payload, dict):
+                return payload, backend
+        text, backend, _ = self.complete(prompt)
+        try:
+            return json.loads(text), backend
+        except (json.JSONDecodeError, TypeError):
+            return {}, "offline"
 
 
 def validate_model_url(url: str) -> str:

@@ -6,10 +6,14 @@ Aegis Forge is organized around explicit boundaries rather than a single prompt 
 flowchart LR
   HTTP[FastAPI / CLI] --> Guard[Security gate]
   Guard --> Retrieve[Runbook retriever]
-  Retrieve --> Plan[Bounded tool planner]
+  Retrieve --> Dense[Optional local embeddings]
+  Retrieve --> Sparse[Lexical retrieval]
+  Dense --> Fuse[Hybrid fusion + rerank]
+  Sparse --> Fuse
+  Fuse --> Plan[Bounded tool planner]
   Plan --> Tools[Read-only tool registry]
   Retrieve --> Model[Ollama or offline synthesizer]
-  Tools --> Model
+  Tools --> Model[Structured model router]
   Memory[(SQLite memory)] --> Model
   Model --> Decision[Evidence-to-decision graph]
   Decision --> Trace[(Append-only trace)]
