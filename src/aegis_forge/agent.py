@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from aegis_forge.config import settings
 from aegis_forge.db import Store
+from aegis_forge.decision import DecisionEngine
 from aegis_forge.model import LocalModel
 from aegis_forge.retrieval import Retriever
 from aegis_forge.security import inspect_input, redact
@@ -28,6 +29,7 @@ class IncidentAgent:
         self.store = Store(self.storage_path)
         self.retriever = Retriever()
         self.registry = ToolRegistry()
+        self.decision_engine = DecisionEngine()
         self.model = model or LocalModel(settings.ollama_url, settings.model)
 
     def _remembered_context(self, namespace: str, limit: int = 5) -> str:
@@ -75,6 +77,7 @@ class IncidentAgent:
                 "confidence": "none",
                 "recommendations": [],
                 "observability": {"security_gate": "blocked"},
+                "decision_graph": None,
             }
 
         sanitized = redact(guard.sanitized)
@@ -118,6 +121,8 @@ class IncidentAgent:
 
         recommendations = self._recommendations(sanitized, evidence)
         confidence = self._infer_confidence(evidence, tool_calls)
+        decision_graph = self.decision_engine.build(sanitized, evidence, tool_calls)
+        self.store.trace(run_id, "decision_graph", decision_graph)
         observability = {
             "security_gate": "passed",
             "retrieval_hits": len(evidence),
@@ -137,6 +142,7 @@ class IncidentAgent:
             "model_backend": backend,
             "confidence": confidence,
             "recommendations": recommendations,
+            "decision_graph": decision_graph,
             "observability": observability,
         }
         return result

@@ -11,7 +11,8 @@ flowchart LR
   Retrieve --> Model[Ollama or offline synthesizer]
   Tools --> Model
   Memory[(SQLite memory)] --> Model
-  Model --> Trace[(Append-only trace)]
+  Model --> Decision[Evidence-to-decision graph]
+  Decision --> Trace[(Append-only trace)]
   Trace --> Metrics[Metrics and dashboard]
 ```
 
@@ -23,3 +24,4 @@ flowchart LR
 - Ollama failure degrades to a deterministic offline response.
 - SQLite uses WAL mode and a busy timeout for concurrent local API requests.
 - Every request and investigation produces observable counters and a run trace.
+- Every investigation produces a decision artifact with citations, alternatives, counterfactuals, reversible actions, and an explicit approval boundary.

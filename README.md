@@ -21,6 +21,7 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Evaluation:** three repeatable incident cases measure keyword task quality and grounding, with scores stored in SQLite.
 - **Security:** input length limits, namespace validation, prompt-injection checks, secret/number redaction, no arbitrary tool execution, and a human-approval boundary for destructive actions.
 - **Service engineering:** app factory, readiness probe, Prometheus-compatible metrics, request validation, SQLite WAL mode, busy timeout, and concurrency-safe persistence.
+- **Evidence-to-decision graph:** ranked hypotheses, source citations, blast-radius framing, reversible actions, counterfactual checks, and explicit human-approval policy. This is the core product differentiator: Aegis turns evidence into an inspectable decision artifact, not an opaque answer.
 
 ## Quick start
 
@@ -65,7 +66,7 @@ curl -X POST http://127.0.0.1:8000/api/investigate \
 	-d '{"incident":"Database connections are exhausted and retries are increasing","namespace":"demo"}'
 ```
 
-Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, `POST /api/evaluate`, `GET /ready`, `GET /metrics`, and `GET /metrics/json`. Open `/docs` for the generated OpenAPI contract.
+Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, `GET /api/runs/{run_id}/decision`, `POST /api/evaluate`, `GET /ready`, `GET /metrics`, and `GET /metrics/json`. Open `/docs` for the generated OpenAPI contract.
 
 ## Architecture
 
@@ -80,7 +81,7 @@ request
 	-> typed API response + operator dashboard
 ```
 
-The code is deliberately modular enough to inspect and serious enough to run. `IncidentAgent` owns the workflow; `Retriever`, `ToolRegistry`, `LocalModel`, `Store`, `ServiceContainer`, and `Metrics` are replaceable boundaries. See [docs/architecture.md](docs/architecture.md) for the system map and [CONTRIBUTING.md](CONTRIBUTING.md) for development rules.
+The code is deliberately modular enough to inspect and serious enough to run. `IncidentAgent` owns the workflow; `Retriever`, `ToolRegistry`, `LocalModel`, `DecisionEngine`, `Store`, `ServiceContainer`, and `Metrics` are replaceable boundaries. Read [docs/architecture.md](docs/architecture.md) and [docs/decision-engine.md](docs/decision-engine.md) for the system map and decision contract.
 
 ## Verification
 
@@ -91,6 +92,17 @@ python -m compileall -q src
 ```
 
 The tests verify injection blocking before tool execution, strict namespace validation, evidence retrieval, bounded tool fan-out, memory and trace persistence, API contracts, Prometheus metrics, relevance ranking, and redaction. CI runs the suite across Python 3.11, 3.12, and 3.13. The local model path is intentionally optional, while the Ollama adapter degrades cleanly when the daemon is absent.
+
+For a deeper verification pass:
+
+```bash
+python -m pytest -q
+python -m ruff check .
+python -m compileall -q src
+docker build -t aegis-forge:verify .
+```
+
+The stress suite exercises 200 concurrent investigations against one SQLite store and verifies unique traces, durable memories, low-confidence unknowns, and the no-mutation safety invariant.
 
 ## Deliberate production boundaries
 

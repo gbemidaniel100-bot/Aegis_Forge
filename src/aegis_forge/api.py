@@ -70,6 +70,14 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run not found")
         return {"run_id": run_id, "trace": events}
 
+    @app.get("/api/runs/{run_id}/decision")
+    def decision_for_run(run_id: str) -> dict[str, Any]:
+        events = service.agent.store.trace_for(run_id)
+        decision = next((event["payload"] for event in events if event["event"] == "decision_graph"), None)
+        if decision is None:
+            raise HTTPException(status_code=404, detail="decision graph not found")
+        return {"run_id": run_id, "decision_graph": decision}
+
     @app.post("/api/evaluate")
     def evaluate() -> dict[str, Any]:
         return evaluate_suite(service.agent.store)

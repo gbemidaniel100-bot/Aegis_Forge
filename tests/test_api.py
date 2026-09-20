@@ -38,5 +38,8 @@ def test_metrics_and_trace_contract():
     trace = client.get(f"/api/runs/{run_id}/trace")
     assert trace.status_code == 200
     assert len(trace.json()["trace"]) >= 4
+    decision = client.get(f"/api/runs/{run_id}/decision")
+    assert decision.status_code == 200
+    assert decision.json()["decision_graph"]["policy"]["human_approval_required"] is True
     metrics = client.get("/metrics").text
     assert "aegis_requests_total" in metrics
