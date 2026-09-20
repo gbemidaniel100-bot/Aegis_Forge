@@ -5,7 +5,7 @@ Aegis Forge can run on a small Linux VM with Docker and systemd while keeping Ol
 ```bash
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin
 sudo usermod -aG docker "$USER"
-git clone https://github.com/gbemidaniel100-bot/Certora-prover aegis-forge
+git clone https://github.com/gbemidaniel100-bot/Aegis_Forge aegis-forge
 cd aegis-forge
 docker compose up -d --build
 curl http://127.0.0.1:8000/ready

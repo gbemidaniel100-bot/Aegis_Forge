@@ -9,6 +9,9 @@
 - 60-task evaluation benchmark with accuracy, hallucination, success, category, and p50/p95 latency reporting.
 - Authenticated propose/approve/execute workflow for human-in-the-loop action control.
 - Cloud VM deployment guide and local-first routing ADR.
+- Deterministic replay, checkpointable trace stages, decaying and deduplicated memory, citation-bearing retrieval, and poisoned-document filtering.
+- Structured facts, inferences, unknowns, counterfactuals, and blast-radius fields in decision graphs.
+- Rate limiting, output egress redaction, private-network SSRF checks, and internal agent-stage telemetry.
 
 ## 0.2.0 - 2026-09-20
 

@@ -69,8 +69,12 @@ class DecisionEngine:
             dependency = "identity-and-secrets"
         else:
             dependency = "gateway-and-application"
+        hypothesis = self._hypothesis(incident, evidence, tools)
         return {
-            "primary_hypothesis": self._hypothesis(incident, evidence, tools),
+            "facts": [{"statement": f"Observed incident signal: {incident}", "source": "request"}],
+            "inferences": [hypothesis["rationale"]],
+            "unknowns": ["Blast radius is unconfirmed until live telemetry is checked."],
+            "primary_hypothesis": hypothesis,
             "alternatives": [
                 "Upstream dependency degradation",
                 "Configuration or capacity mismatch",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict, deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -51,3 +51,20 @@ class Metrics:
             f"aegis_operation_duration_ms_max {snapshot['duration_max_ms']}",
         ])
         return "\n".join(lines) + "\n"
+
+
+@dataclass
+class RateLimiter:
+    limit: int = 60
+    window_seconds: float = 60.0
+    hits: dict[str, deque[float]] = field(default_factory=lambda: defaultdict(deque))
+
+    def allow(self, identity: str) -> bool:
+        now = perf_counter()
+        history = self.hits[identity]
+        while history and now - history[0] >= self.window_seconds:
+            history.popleft()
+        if len(history) >= self.limit:
+            return False
+        history.append(now)
+        return True

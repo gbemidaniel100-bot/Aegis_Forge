@@ -41,7 +41,7 @@ def run_benchmark(agent: IncidentAgent | None = None, repetitions: int = 20) -> 
         "accuracy": round(sum(row["retrieval"] for row in rows) / count, 4),
         "hallucination_rate": round(sum(row["hallucination"] for row in rows) / count, 4),
         "success_rate": round(sum(row["success"] for row in rows) / count, 4),
-        "latency_ms": {"p50": _percentile([row["latency_ms"] for row in rows], 0.5), "p95": _percentile([row["latency_ms"] for row in rows], 0.95)},
+        "latency_ms": {"p50": _percentile([row["latency_ms"] for row in rows], 0.5), "p95": _percentile([row["latency_ms"] for row in rows], 0.95), "p99": _percentile([row["latency_ms"] for row in rows], 0.99)},
         "by_category": {category: _aggregate([row for row in rows if row["category"] == category]) for category in sorted({row["category"] for row in rows})},
     }
 

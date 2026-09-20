@@ -11,18 +11,18 @@ from aegis_forge.db import Store
 class ApprovalWorkflow:
     store: Store
 
-    def propose(self, run_id: str, action: dict[str, Any]) -> dict[str, Any]:
+    def propose(self, run_id: str, action: dict[str, Any], actor: str = "operator", reason: str = "incident response") -> dict[str, Any]:
         approval_id = str(uuid.uuid4())
-        proposal = {"approval_id": approval_id, "run_id": run_id, "action": action, "status": "proposed"}
+        proposal = {"approval_id": approval_id, "run_id": run_id, "action": action, "actor": actor, "reason": reason, "status": "proposed"}
         self.store.trace(run_id, "approval_proposed", proposal)
         return proposal
 
-    def approve(self, run_id: str, approval_id: str) -> dict[str, Any]:
+    def approve(self, run_id: str, approval_id: str, actor: str = "approver") -> dict[str, Any]:
         events = self.store.trace_for(run_id)
         proposal = next((event["payload"] for event in events if event["event"] == "approval_proposed" and event["payload"].get("approval_id") == approval_id), None)
         if proposal is None:
             raise ValueError("approval proposal not found")
-        approved = {**proposal, "status": "approved"}
+        approved = {**proposal, "approved_by": actor, "status": "approved"}
         self.store.trace(run_id, "approval_granted", approved)
         return approved
 

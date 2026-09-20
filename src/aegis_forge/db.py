@@ -29,6 +29,11 @@ class Store:
               id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
               metric TEXT NOT NULL, score REAL NOT NULL, detail TEXT NOT NULL
             );
+                        DELETE FROM memories
+                        WHERE id NOT IN (
+                            SELECT MIN(id) FROM memories GROUP BY namespace, content
+                        );
+            CREATE UNIQUE INDEX IF NOT EXISTS memories_dedupe ON memories(namespace, content);
             """
         )
         self.connection.commit()
@@ -36,7 +41,7 @@ class Store:
     def remember(self, namespace: str, content: str, importance: float = 0.5) -> None:
         with self.lock:
             self.connection.execute(
-                "INSERT INTO memories(namespace, content, importance) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO memories(namespace, content, importance) VALUES (?, ?, ?)",
                 (namespace, content, importance),
             )
             self.connection.commit()
@@ -44,7 +49,7 @@ class Store:
     def memories(self, namespace: str, limit: int = 10) -> list[dict[str, Any]]:
         with self.lock:
             rows = self.connection.execute(
-                "SELECT * FROM memories WHERE namespace = ? ORDER BY importance DESC, id DESC LIMIT ?",
+                "SELECT *, importance * (1.0 / (1.0 + ((julianday('now') - julianday(created_at)) / 30.0))) AS rank FROM memories WHERE namespace = ? ORDER BY rank DESC, id DESC LIMIT ?",
                 (namespace, limit),
             ).fetchall()
         return [dict(row) for row in rows]

@@ -11,6 +11,9 @@ class Document:
     title: str
     text: str
     source: str = "runbook"
+    version: str = "1"
+    confidence: float = 1.0
+    trusted: bool = True
 
 
 DEFAULT_CORPUS = [
@@ -33,10 +36,14 @@ class Retriever:
         query_tokens = _tokens(query)
         scored = []
         for document in self.documents:
+            if not document.trusted or re.search(r"ignore .*instructions|reveal .*secret|system prompt", document.text, re.IGNORECASE):
+                continue
             doc_tokens = _tokens(document.title + " " + document.text)
             overlap = len(query_tokens & doc_tokens)
-            score = overlap / math.sqrt(max(len(query_tokens) * len(doc_tokens), 1))
+            lexical = overlap / math.sqrt(max(len(query_tokens) * len(doc_tokens), 1))
+            title_boost = 0.15 if query_tokens & _tokens(document.title) else 0.0
+            score = lexical + title_boost
             if overlap:
                 scored.append((score, document))
         scored.sort(key=lambda item: item[0], reverse=True)
-        return [{"id": doc.doc_id, "title": doc.title, "text": doc.text, "source": doc.source, "score": round(score, 4)} for score, doc in scored[:limit]]
+        return [{"id": doc.doc_id, "title": doc.title, "text": doc.text, "source": doc.source, "version": doc.version, "confidence": doc.confidence, "score": round(score, 4), "citation": f"{doc.source}:{doc.doc_id}@{doc.version}"} for score, doc in scored[:limit]]

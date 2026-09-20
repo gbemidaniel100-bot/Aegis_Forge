@@ -14,4 +14,21 @@ DASHBOARD = """<!doctype html>
 
 
 def dashboard() -> HTMLResponse:
-    return HTMLResponse(DASHBOARD)
+        pipeline = """
+        <section class="panel" style="margin-top:18px"><h2>Live investigation pipeline</h2>
+        <div id="pipeline" class="chips"><span class="chip">security</span><span class="chip">RAG</span><span class="chip">routing</span><span class="chip">tools</span><span class="chip">decision</span><span class="chip">memory</span><span class="chip">approval</span></div>
+        <pre id="events" class="result" style="max-height:180px;overflow:auto;margin-top:12px">Events will appear here after a run.</pre></section>
+        <script>
+        const nativeFetch=window.fetch;
+        window.fetch=async function(...args){const response=await nativeFetch(...args);if(String(args[0]).includes('/api/investigate')){response.clone().json().then(data=>{window.lastRunId=data.run_id});}return response;};
+        const originalInvestigate=investigate;
+        investigate=async function(){
+            await originalInvestigate();
+            const text=document.querySelector('#result').textContent;
+            const match=text.match(/Trace events: (\\d+)/);
+            document.querySelector('#events').textContent=match?`Completed ${match[1]} traced stages. Open the run trace endpoint for the full event payload.`:text;
+            if(window.lastRunId){const stream=new EventSource('/api/runs/'+window.lastRunId+'/events');stream.onmessage=event=>{document.querySelector('#events').textContent+=`\\n${event.type}: ${event.data}`;};}
+        };
+        </script>
+        """
+        return HTMLResponse(DASHBOARD.replace("</main>", pipeline + "</main>"))

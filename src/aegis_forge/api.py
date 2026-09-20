@@ -5,11 +5,12 @@ import json
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from aegis_forge.benchmark import run_benchmark
 from aegis_forge.evaluation import evaluate_suite
+from aegis_forge.replay import replay_run
 from aegis_forge.service import ServiceContainer
 from aegis_forge.telemetry import tracer
 from aegis_forge.web import dashboard
@@ -28,11 +29,14 @@ class InvestigationRequest(BaseModel):
 class ApprovalRequest(BaseModel):
     run_id: str
     action: dict[str, Any]
+    actor: str = "operator"
+    reason: str = "incident response"
 
 
 class ApprovalDecision(BaseModel):
     run_id: str
     approval_id: str
+    actor: str = "operator"
 
 
 def _authorize(service: ServiceContainer, token: str | None) -> None:
@@ -47,6 +51,9 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def observe_requests(request: Request, call_next):
+        identity = request.client.host if request.client else "unknown"
+        if not service.limiter.allow(identity):
+            return JSONResponse(status_code=429, content={"detail": "rate limit exceeded"})
         with tracer.start_as_current_span(f"HTTP {request.method} {request.url.path}") as span:
             span.set_attribute("http.method", request.method)
             span.set_attribute("http.route", request.url.path)
@@ -103,6 +110,13 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="decision graph not found")
         return {"run_id": run_id, "decision_graph": decision}
 
+    @app.post("/api/runs/{run_id}/replay")
+    def replay(run_id: str) -> dict[str, Any]:
+        try:
+            return replay_run(service.agent.store, run_id, service.agent)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     @app.get("/api/runs/{run_id}/events")
     async def events(run_id: str):
         async def stream():
@@ -120,12 +134,12 @@ def create_app(container: ServiceContainer | None = None) -> FastAPI:
     @app.post("/api/approvals/propose")
     def propose_approval(request: ApprovalRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
         _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
-        return service.approvals.propose(request.run_id, request.action)
+        return service.approvals.propose(request.run_id, request.action, request.actor, request.reason)
 
     @app.post("/api/approvals/approve")
     def approve(request: ApprovalDecision, authorization: str | None = Header(default=None)) -> dict[str, Any]:
         _authorize(service, authorization.removeprefix("Bearer ").strip() if authorization else None)
-        return service.approvals.approve(request.run_id, request.approval_id)
+        return service.approvals.approve(request.run_id, request.approval_id, request.actor)
 
     @app.post("/api/approvals/execute")
     def execute(request: ApprovalDecision, authorization: str | None = Header(default=None)) -> dict[str, Any]:

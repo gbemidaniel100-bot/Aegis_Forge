@@ -32,3 +32,11 @@ def redact(text: str) -> str:
     text = re.sub(r"(?i)(api[_ -]?key|token|password)\s*[:=]\s*\S+", r"\1=[REDACTED]", text)
     text = re.sub(r"\b(?:[A-Za-z]+\d{8,}[A-Za-z0-9]*|\d{12,})\b", "[REDACTED_NUMBER]", text)
     return text
+
+
+def validate_output(text: str, maximum: int = 12000) -> str:
+    """Bound model output and prevent obvious secret leakage at the egress boundary."""
+    bounded = text.strip()[:maximum]
+    if not bounded:
+        return "No model response was available; use the evidence and runbook recommendations."
+    return redact(bounded)

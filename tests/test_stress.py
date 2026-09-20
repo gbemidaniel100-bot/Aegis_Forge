@@ -20,4 +20,7 @@ def test_concurrent_investigations_keep_distinct_traces():
         assert len(run_ids) == len(incidents)
         assert all(result["allowed"] for result in results)
         assert all(result["trace"] for result in results)
-        assert len(agent.store.memories("stress", limit=len(incidents))) == len(incidents)
+        memories = agent.store.memories("stress", limit=len(incidents))
+        assert len(memories) == 3
+        content = " ".join(memory["content"].lower() for memory in memories)
+        assert all(signal in content for signal in ("database", "gateway", "token"))

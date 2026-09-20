@@ -8,7 +8,8 @@ from aegis_forge.db import Store
 from aegis_forge.decision import DecisionEngine
 from aegis_forge.model import LocalModel
 from aegis_forge.retrieval import Retriever
-from aegis_forge.security import inspect_input, redact
+from aegis_forge.security import inspect_input, redact, validate_output
+from aegis_forge.telemetry import tracer
 from aegis_forge.tools import ToolRegistry
 
 
@@ -80,17 +81,20 @@ class IncidentAgent:
                 "decision_graph": None,
             }
 
-        sanitized = redact(guard.sanitized)
-        evidence = self.retriever.search(sanitized, limit=3)
+        with tracer.start_as_current_span("aegis.security"):
+            sanitized = redact(guard.sanitized)
+        with tracer.start_as_current_span("aegis.retrieval"):
+            evidence = self.retriever.search(sanitized, limit=3)
         self.store.trace(run_id, "retrieval", {"query": sanitized, "hits": evidence})
 
         tool_calls: list[dict] = []
-        for tool_name in self.registry.available[: min(len(self.registry.available), settings.max_tool_calls)]:
-            signal = sanitized.lower()
-            if "database" in signal and tool_name == "service_health" or "5xx" in signal and tool_name in {"service_health", "recent_deploys"} or "credential" in signal and tool_name == "error_sample" or "database" in signal and tool_name == "dependency_graph":
-                result = self.registry.run(tool_name, sanitized)
-                tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
-            self.store.trace(run_id, "tool_call", {"name": tool_name, "triggered": tool_name in {item['name'] for item in tool_calls}})
+        with tracer.start_as_current_span("aegis.tools"):
+            for tool_name in self.registry.available[: min(len(self.registry.available), settings.max_tool_calls)]:
+                signal = sanitized.lower()
+                if "database" in signal and tool_name == "service_health" or "5xx" in signal and tool_name in {"service_health", "recent_deploys"} or "credential" in signal and tool_name == "error_sample" or "database" in signal and tool_name == "dependency_graph":
+                    result = self.registry.run(tool_name, sanitized)
+                    tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
+                self.store.trace(run_id, "tool_call", {"name": tool_name, "triggered": tool_name in {item['name'] for item in tool_calls}})
 
         if not tool_calls:
             tool_calls.append({"name": "service_health", "risk": "read-only", "data": {"status": "no_specific_signal_matched"}})
@@ -106,7 +110,8 @@ class IncidentAgent:
             + "\n\nTool outputs:\n"
             + str(tool_calls)
         )
-        completion = self.model.complete(prompt)
+        with tracer.start_as_current_span("aegis.model"):
+            completion = self.model.complete(prompt)
         if len(completion) == 3:
             response, backend, routing = completion
         else:
@@ -119,14 +124,17 @@ class IncidentAgent:
                 "Recommended action: verify the newest release, inspect database or gateway health, and confirm the error budget before rollback or escalation."
             )
             backend = "offline"
+        response = validate_output(response)
         self.store.trace(run_id, "completion", {"model_backend": backend, "response": response, "routing": routing})
 
         memory_text = f"namespace={namespace}; incident={sanitized}; summary={response[:500]}"
-        self.store.remember(namespace, memory_text, importance=0.8)
+        with tracer.start_as_current_span("aegis.memory"):
+            self.store.remember(namespace, memory_text, importance=0.8)
 
         recommendations = self._recommendations(sanitized, evidence)
         confidence = self._infer_confidence(evidence, tool_calls)
-        decision_graph = self.decision_engine.build(sanitized, evidence, tool_calls)
+        with tracer.start_as_current_span("aegis.decision"):
+            decision_graph = self.decision_engine.build(sanitized, evidence, tool_calls)
         self.store.trace(run_id, "decision_graph", decision_graph)
         observability = {
             "security_gate": "passed",

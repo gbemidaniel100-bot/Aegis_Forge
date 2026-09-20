@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import time
 from dataclasses import dataclass
 from urllib.parse import urlparse
@@ -54,4 +55,11 @@ def validate_model_url(url: str) -> str:
     blocked_hosts = {"127.0.0.1.nip.io", "169.254.169.254", "metadata.google.internal"}
     if parsed.hostname in blocked_hosts:
         raise ValueError("model URL targets a blocked metadata host")
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+        if address.is_private and not address.is_loopback:
+            raise ValueError("model URL targets a private network address")
+    except ValueError as exc:
+        if "private network" in str(exc):
+            raise
     return url.rstrip("/")

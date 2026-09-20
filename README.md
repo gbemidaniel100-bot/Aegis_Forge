@@ -2,7 +2,7 @@
 
 **A production-shaped, local-first AI incident operations platform.**
 
-[![CI](https://github.com/gbemidaniel100-bot/Certora-prover/actions/workflows/ci.yml/badge.svg)](https://github.com/gbemidaniel100-bot/Certora-prover/actions/workflows/ci.yml)
+[![CI](https://github.com/gbemidaniel100-bot/Aegis_Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/gbemidaniel100-bot/Aegis_Forge/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-5fcf80)](LICENSE)
 
@@ -18,7 +18,7 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Tool use:** an allowlisted registry of deterministic adapters. Every adapter is read-only, risk-labelled, bounded by `AEGIS_MAX_TOOL_CALLS`, and recorded.
 - **Memory:** SQLite stores namespace-scoped incident learnings with importance ordering.
 - **Observability:** every run emits append-only events for security, retrieval, tool calls, and completion; traces are available from the API.
-- **Evaluation:** three repeatable incident cases measure keyword task quality and grounding, with scores stored in SQLite.
+- **Evaluation:** a reproducible 60-task incident benchmark measures retrieval quality, evidence-bound hallucination, success, category quality, and p50/p95/p99 latency.
 - **Security:** input length limits, namespace validation, prompt-injection checks, secret/number redaction, no arbitrary tool execution, and a human-approval boundary for destructive actions.
 - **Service engineering:** app factory, readiness probe, Prometheus-compatible metrics, request validation, SQLite WAL mode, busy timeout, and concurrency-safe persistence.
 - **Evidence-to-decision graph:** ranked hypotheses, source citations, blast-radius framing, reversible actions, counterfactual checks, and explicit human-approval policy. This is the core product differentiator: Aegis turns evidence into an inspectable decision artifact, not an opaque answer.
@@ -99,7 +99,7 @@ make lint
 python -m compileall -q src
 ```
 
-The tests verify injection blocking before tool execution, strict namespace validation, evidence retrieval, bounded tool fan-out, memory and trace persistence, API contracts, Prometheus metrics, relevance ranking, and redaction. CI runs the suite across Python 3.11, 3.12, and 3.13. The local model path is intentionally optional, while the Ollama adapter degrades cleanly when the daemon is absent.
+The tests verify injection blocking before tool execution, strict namespace validation, evidence retrieval, poisoned-document filtering, bounded tool fan-out, replay, decaying/deduplicated memory, API contracts, Prometheus metrics, OpenTelemetry trace headers, approval enforcement, relevance ranking, and redaction. CI runs the suite across Python 3.11, 3.12, and 3.13. The local model path is intentionally optional, while the Ollama adapter degrades cleanly when the daemon is absent.
 
 For a deeper verification pass:
 
@@ -110,7 +110,7 @@ python -m compileall -q src
 docker build -t aegis-forge:verify .
 ```
 
-The stress suite exercises 200 concurrent investigations against one SQLite store and verifies unique traces, durable memories, low-confidence unknowns, and the no-mutation safety invariant.
+The release verification includes a 100-investigation concurrent load pass against one SQLite store and verifies unique traces, deduplicated memories, low-confidence unknowns, and the no-mutation safety invariant. A separate 200-run decision stress pass is documented in the release notes.
 
 ## Deliberate production boundaries
 
