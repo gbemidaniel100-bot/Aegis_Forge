@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aegis-forge"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first AI incident operations workbench with agents, RAG, tools, memory, and evaluation."
 readme = "README.md"
 requires-python = ">=3.11"

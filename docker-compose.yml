@@ -1,0 +1,23 @@
+services:
+  aegis:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AEGIS_ENVIRONMENT: container
+      AEGIS_OLLAMA_URL: http://ollama:11434
+      AEGIS_MODEL: llama3.2:3b
+      AEGIS_DB_PATH: /var/lib/aegis/aegis.db
+    volumes:
+      - aegis-data:/var/lib/aegis
+    depends_on:
+      ollama:
+        condition: service_started
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  aegis-data:
+  ollama-data:

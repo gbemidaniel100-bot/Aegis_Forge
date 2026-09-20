@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import uuid
+from dataclasses import dataclass
 
 from aegis_forge.config import settings
 from aegis_forge.db import Store
@@ -84,16 +84,7 @@ class IncidentAgent:
         tool_calls: list[dict] = []
         for tool_name in self.registry.available[: min(len(self.registry.available), settings.max_tool_calls)]:
             signal = sanitized.lower()
-            if "database" in signal and tool_name == "service_health":
-                result = self.registry.run(tool_name, sanitized)
-                tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
-            elif "5xx" in signal and tool_name in {"service_health", "recent_deploys"}:
-                result = self.registry.run(tool_name, sanitized)
-                tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
-            elif "credential" in signal and tool_name == "error_sample":
-                result = self.registry.run(tool_name, sanitized)
-                tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
-            elif "database" in signal and tool_name == "dependency_graph":
+            if "database" in signal and tool_name == "service_health" or "5xx" in signal and tool_name in {"service_health", "recent_deploys"} or "credential" in signal and tool_name == "error_sample" or "database" in signal and tool_name == "dependency_graph":
                 result = self.registry.run(tool_name, sanitized)
                 tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
             self.store.trace(run_id, "tool_call", {"name": tool_name, "triggered": tool_name in {item['name'] for item in tool_calls}})

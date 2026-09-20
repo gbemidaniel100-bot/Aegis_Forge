@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 INJECTION_PATTERNS = (
     r"ignore (all|any|previous|prior) instructions",
     r"system prompt",
@@ -20,7 +19,7 @@ class GuardResult:
 
 
 def inspect_input(text: str) -> GuardResult:
-    reasons = ["prompt_injection_signal" for pattern in INJECTION_PATTERNS if re.search(pattern, text, re.I)]
+    reasons = ["prompt_injection_signal" for pattern in INJECTION_PATTERNS if re.search(pattern, text, re.IGNORECASE)]
     if reasons:
         return GuardResult(False, "", reasons)
     sanitized = text.strip()[:12000]

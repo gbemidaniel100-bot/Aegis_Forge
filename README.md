@@ -1,8 +1,12 @@
 # Aegis Forge
 
-**A local-first AI systems engineering portfolio project for incident operations.**
+**A production-shaped, local-first AI incident operations platform.**
 
-Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give it an operational signal and it coordinates a guarded investigation: it retrieves runbook evidence, plans bounded read-only tool calls, uses an Ollama model when available, falls back to a deterministic offline analyst, persists useful memory, and returns a trace showing what happened.
+[![CI](https://github.com/gbemidaniel100-bot/Certora-prover/actions/workflows/ci.yml/badge.svg)](https://github.com/gbemidaniel100-bot/Certora-prover/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-5fcf80)](LICENSE)
+
+Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give it an operational signal and it coordinates a guarded investigation: it retrieves runbook evidence, plans bounded read-only tool calls, uses an Ollama model when available, falls back to a deterministic offline analyst, persists useful memory, and returns a trace showing what happened. It ships as a Python package, container, Compose stack, CLI, API, dashboard, evaluation harness, and CI-tested repository.
 
 ![Aegis Forge dashboard](docs/dashboard.svg)
 
@@ -16,6 +20,7 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Observability:** every run emits append-only events for security, retrieval, tool calls, and completion; traces are available from the API.
 - **Evaluation:** three repeatable incident cases measure keyword task quality and grounding, with scores stored in SQLite.
 - **Security:** input length limits, namespace validation, prompt-injection checks, secret/number redaction, no arbitrary tool execution, and a human-approval boundary for destructive actions.
+- **Service engineering:** app factory, readiness probe, Prometheus-compatible metrics, request validation, SQLite WAL mode, busy timeout, and concurrency-safe persistence.
 
 ## Quick start
 
@@ -31,6 +36,14 @@ Open `http://127.0.0.1:8000`. The dashboard works immediately in offline mode. F
 ```bash
 ollama pull llama3.2:3b
 ```
+
+### Container quick start
+
+```bash
+docker compose up --build
+```
+
+The Compose profile starts Aegis Forge and Ollama with persistent volumes. Aegis remains useful when Ollama is unavailable because the deterministic offline analyst is a deliberate resilience path.
 
 Configuration is environment-based:
 
@@ -52,7 +65,7 @@ curl -X POST http://127.0.0.1:8000/api/investigate \
 	-d '{"incident":"Database connections are exhausted and retries are increasing","namespace":"demo"}'
 ```
 
-Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, and `POST /api/evaluate`.
+Important endpoints are `POST /api/investigate`, `GET /api/runs/{run_id}/trace`, `POST /api/evaluate`, `GET /ready`, `GET /metrics`, and `GET /metrics/json`. Open `/docs` for the generated OpenAPI contract.
 
 ## Architecture
 
@@ -67,26 +80,21 @@ request
 	-> typed API response + operator dashboard
 ```
 
-The code is deliberately small enough to inspect in one sitting. `IncidentAgent` owns the workflow; `Retriever`, `ToolRegistry`, `LocalModel`, and `Store` are replaceable boundaries. A production adapter can implement the same tool contract without changing the agent policy.
+The code is deliberately modular enough to inspect and serious enough to run. `IncidentAgent` owns the workflow; `Retriever`, `ToolRegistry`, `LocalModel`, `Store`, `ServiceContainer`, and `Metrics` are replaceable boundaries. See [docs/architecture.md](docs/architecture.md) for the system map and [CONTRIBUTING.md](CONTRIBUTING.md) for development rules.
 
 ## Verification
 
 ```bash
-python -m unittest discover -s tests -v
+make test
+make lint
 python -m compileall -q src
-pytest -q                 # after installing [dev]
-ruff check .              # after installing [dev]
 ```
 
-The tests verify injection blocking before tool execution, evidence retrieval, bounded tool fan-out, memory and trace persistence, relevance ranking, and redaction. The local model path is intentionally tested through a fake model, while the Ollama adapter degrades cleanly when the daemon is absent.
+The tests verify injection blocking before tool execution, strict namespace validation, evidence retrieval, bounded tool fan-out, memory and trace persistence, API contracts, Prometheus metrics, relevance ranking, and redaction. CI runs the suite across Python 3.11, 3.12, and 3.13. The local model path is intentionally optional, while the Ollama adapter degrades cleanly when the daemon is absent.
 
-## Production hardening roadmap
+## Deliberate production boundaries
 
-1. Replace the in-memory corpus with a versioned vector index and document ACL filtering.
-2. Add OIDC identity, per-tenant encryption keys, rate limits, and a real secrets manager.
-3. Add OpenTelemetry spans and Prometheus counters around model latency, retrieval recall, and tool failures.
-4. Put destructive remediation behind a separate approval service and signed action tokens.
-5. Expand evals with golden evidence citations, injection suites, cost/latency budgets, and regression gates in CI.
+The repository intentionally keeps dangerous capabilities outside the default runtime. Before connecting it to production telemetry, add OIDC identity, tenant authorization, a managed database, document ACL filtering, rate limits, a secrets manager, OpenTelemetry spans, and a separate approval service for mutating actions. See [SECURITY.md](SECURITY.md) for the threat-model boundary.
 
 ## License
 
