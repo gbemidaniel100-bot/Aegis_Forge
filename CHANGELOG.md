@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 - 2026-09-20
+
+### Added
+
+- Complexity- and context-aware model routing with latency/failure history and selection rationale.
+- Replay from recorded retrieval and tool evidence, rather than re-querying external systems.
+- Precision, recall, groundedness, tool accuracy, decision quality, recovery, regression, and p99 evaluation metrics.
+- Measured concurrency profiling for 1, 10, 50, 100, and 200 workers with throughput, failure rate, latency, and peak memory.
+- Partial RAG, tool, and memory failure recovery with trace events.
+
 ## 0.3.0 - 2026-09-20
 
 ### Added

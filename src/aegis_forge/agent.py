@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from dataclasses import dataclass
 
@@ -84,17 +85,25 @@ class IncidentAgent:
         with tracer.start_as_current_span("aegis.security"):
             sanitized = redact(guard.sanitized)
         with tracer.start_as_current_span("aegis.retrieval"):
-            evidence = self.retriever.search(sanitized, limit=3)
+            try:
+                evidence = self.retriever.search(sanitized, limit=3)
+            except (OSError, RuntimeError, ValueError) as exc:
+                evidence = []
+                self.store.trace(run_id, "retrieval_failure", {"error": type(exc).__name__})
         self.store.trace(run_id, "retrieval", {"query": sanitized, "hits": evidence})
 
         tool_calls: list[dict] = []
         with tracer.start_as_current_span("aegis.tools"):
             for tool_name in self.registry.available[: min(len(self.registry.available), settings.max_tool_calls)]:
                 signal = sanitized.lower()
-                if "database" in signal and tool_name == "service_health" or "5xx" in signal and tool_name in {"service_health", "recent_deploys"} or "credential" in signal and tool_name == "error_sample" or "database" in signal and tool_name == "dependency_graph":
-                    result = self.registry.run(tool_name, sanitized)
-                    tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
-                self.store.trace(run_id, "tool_call", {"name": tool_name, "triggered": tool_name in {item['name'] for item in tool_calls}})
+                if "database" in signal and tool_name == "service_health" or "5xx" in signal and tool_name in {"service_health", "recent_deploys"} or ("credential" in signal or "token" in signal) and tool_name == "error_sample" or "database" in signal and tool_name == "dependency_graph":
+                    try:
+                        result = self.registry.run(tool_name, sanitized)
+                        tool_calls.append({"name": result.name, "risk": result.risk, "data": result.data})
+                    except (OSError, RuntimeError, ValueError) as exc:
+                        self.store.trace(run_id, "tool_failure", {"name": tool_name, "error": type(exc).__name__})
+                tool = next((item for item in tool_calls if item["name"] == tool_name), None)
+                self.store.trace(run_id, "tool_call", {"name": tool_name, "triggered": tool is not None, "result": tool})
 
         if not tool_calls:
             tool_calls.append({"name": "service_health", "risk": "read-only", "data": {"status": "no_specific_signal_matched"}})
@@ -128,8 +137,13 @@ class IncidentAgent:
         self.store.trace(run_id, "completion", {"model_backend": backend, "response": response, "routing": routing})
 
         memory_text = f"namespace={namespace}; incident={sanitized}; summary={response[:500]}"
+        memory_status = "persisted"
         with tracer.start_as_current_span("aegis.memory"):
-            self.store.remember(namespace, memory_text, importance=0.8)
+            try:
+                self.store.remember(namespace, memory_text, importance=0.8)
+            except (OSError, sqlite3.Error):
+                memory_status = "failed"
+                self.store.trace(run_id, "memory_failure", {"namespace": namespace})
 
         recommendations = self._recommendations(sanitized, evidence)
         confidence = self._infer_confidence(evidence, tool_calls)
@@ -144,6 +158,7 @@ class IncidentAgent:
             "model_backend": backend,
             "routing": routing,
             "memory_count": len(self.store.memories(namespace, limit=10)),
+            "memory_status": memory_status,
         }
 
         result = {

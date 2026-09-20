@@ -27,6 +27,7 @@ Aegis Forge is an auditable incident command workbench, not a chat wrapper. Give
 - **Live operations:** server-sent event streams expose security, retrieval, tool, model, decision, and approval stages to the dashboard.
 - **Evaluation science:** a 60-task benchmark reports retrieval accuracy, evidence-bound hallucination rate, success rate, per-category quality, and p50/p95 latency.
 - **OpenTelemetry:** every HTTP request gets a service span and trace ID response header, ready for OTLP exporters without changing the application workflow.
+- **Performance engineering:** the checked-in load profiler measures 1/10/50/100/200-worker runs with throughput, failure rate, p50/p95/p99 latency, and peak traced memory.
 
 ## Quick start
 
@@ -111,6 +112,8 @@ docker build -t aegis-forge:verify .
 ```
 
 The release verification includes a 100-investigation concurrent load pass against one SQLite store and verifies unique traces, deduplicated memories, low-confidence unknowns, and the no-mutation safety invariant. A separate 200-run decision stress pass is documented in the release notes.
+
+The latest offline reference run measured 0% failures across all load levels. At 200 workers it measured approximately 205 requests/second, p50 887.69 ms, p95 911.82 ms, p99 914.18 ms, and 2.917 MB peak traced memory. These are local deterministic fallback measurements, not Ollama production capacity claims.
 
 ## Deliberate production boundaries
 

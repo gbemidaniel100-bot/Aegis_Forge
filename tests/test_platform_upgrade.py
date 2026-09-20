@@ -5,7 +5,7 @@ import pytest
 
 from aegis_forge.agent import IncidentAgent
 from aegis_forge.approval import ApprovalWorkflow
-from aegis_forge.benchmark import run_benchmark, task_matrix
+from aegis_forge.benchmark import run_benchmark, run_load_profile, task_matrix
 from aegis_forge.db import Store
 from aegis_forge.observability import RateLimiter
 from aegis_forge.replay import replay_run
@@ -111,3 +111,34 @@ def test_model_router_fails_over_after_provider_failure():
 def test_tool_registry_rejects_arbitrary_execution():
     with pytest.raises(ValueError):
         ToolRegistry().run("shell_exec", "incident")
+
+
+def test_small_load_profile_reports_latency_and_memory():
+    with tempfile.TemporaryDirectory() as directory:
+        rows = run_load_profile(IncidentAgent(storage_path=str(Path(directory) / "perf.db")), (1, 2), 1)
+    assert [row["concurrency"] for row in rows] == [1, 2]
+    assert all(set(row["latency_ms"]) == {"p50", "p95", "p99"} for row in rows)
+    assert all(row["failure_rate"] == 0.0 for row in rows)
+
+
+def test_retrieval_and_tool_failures_degrade_to_observable_partial_results():
+    with tempfile.TemporaryDirectory() as directory:
+        agent = IncidentAgent(storage_path=str(Path(directory) / "chaos.db"))
+
+        class BrokenRetriever:
+            def search(self, query, limit=3):
+                raise RuntimeError("rag unavailable")
+
+        class BrokenTools:
+            available = ("service_health",)
+
+            def run(self, name, incident):
+                raise RuntimeError("tool timeout")
+
+        agent.retriever = BrokenRetriever()
+        agent.registry = BrokenTools()
+        result = agent.investigate("Database connections are exhausted", namespace="chaos")
+        events = {event["event"] for event in result["trace"]}
+        assert result["allowed"] is True
+        assert "retrieval_failure" in events
+        assert "tool_failure" in events

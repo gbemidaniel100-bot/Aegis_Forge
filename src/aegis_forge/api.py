@@ -46,7 +46,7 @@ def _authorize(service: ServiceContainer, token: str | None) -> None:
 
 def create_app(container: ServiceContainer | None = None) -> FastAPI:
     service = container or ServiceContainer.create()
-    app = FastAPI(title="Aegis Forge", version="0.3.0", description="Guarded local AI incident operations")
+    app = FastAPI(title="Aegis Forge", version="0.4.0", description="Guarded local AI incident operations")
     app.state.service = service
 
     @app.middleware("http")
