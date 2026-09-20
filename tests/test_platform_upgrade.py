@@ -68,6 +68,15 @@ def test_retrieval_filters_poisoned_documents_and_returns_citations():
     assert results[0]["citation"] == "runbook:trusted@2"
 
 
+def test_retriever_supports_injected_semantic_encoder():
+    class Encoder:
+        def encode(self, text):
+            return [1.0, 0.0] if "database" in text.lower() else [0.0, 1.0]
+
+    result = Retriever(encoder=Encoder()).search_hybrid("database issue", limit=1)
+    assert result[0]["retrieval_mode"] == "hybrid"
+
+
 def test_benchmark_reports_p99():
     result = run_benchmark(repetitions=1)
     assert "p99" in result["latency_ms"]
